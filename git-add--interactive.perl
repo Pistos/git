@@ -2,6 +2,7 @@
 
 use strict;
 use Git;
+use Term::InKey;
 
 my $repo = Git->repository();
 
@@ -781,6 +782,7 @@ J - leave this hunk undecided, see next hunk
 k - leave this hunk undecided, see previous undecided hunk
 K - leave this hunk undecided, see previous hunk
 s - split the current hunk into smaller hunks
+q - quit
 ? - print help
 EOF
 }
@@ -885,11 +887,15 @@ sub patch_update_file {
 		if (hunk_splittable($hunk[$ix]{TEXT})) {
 			$other .= '/s';
 		}
+
+                $other .= '/q';
+
 		for (@{$hunk[$ix]{DISPLAY}}) {
 			print;
 		}
 		print colored $prompt_color, "Stage this hunk [y/n/a/d$other/?]? ";
-		my $line = <STDIN>;
+                my $line = &ReadKey;
+                print "\n";
 		if ($line) {
 			if ($line =~ /^y/i) {
 				$hunk[$ix]{USE} = 1;
@@ -915,6 +921,9 @@ sub patch_update_file {
 				}
 				next;
 			}
+			elsif ($line =~ /^q/i) {
+                            quit_cmd();
+                        }
 			elsif ($other =~ /K/ && $line =~ /^K/) {
 				$ix--;
 				next;
