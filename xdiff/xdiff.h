@@ -99,9 +99,15 @@ long xdl_mmfile_size(mmfile_t *mmf);
 int xdl_diff(mmfile_t *mf1, mmfile_t *mf2, xpparam_t const *xpp,
 	     xdemitconf_t const *xecfg, xdemitcb_t *ecb);
 
+#define XDL_MERGE_FAVOR_OURS		1
+#define XDL_MERGE_FAVOR_THEIRS		2
+#define XDL_MERGE_FAVOR(flag)		(((flag)>>4) & 03)
+#define XDL_MERGE_LEVEL(flag)		((flag) & 07)
+#define XDL_MERGE_FLAGS(level,flag)	((level) | ((flag)<<4))
+
 int xdl_merge(mmfile_t *orig, mmfile_t *mf1, const char *name1,
 		mmfile_t *mf2, const char *name2,
-		xpparam_t const *xpp, int level, mmbuffer_t *result);
+		xpparam_t const *xpp, int flag, mmbuffer_t *result);
 
 #ifdef __cplusplus
 }
