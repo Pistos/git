@@ -539,7 +539,7 @@ $git_dir = "$projectroot/$project" if $project;
 
 # dispatch
 my %actions = (
-	"blame" => \&git_blame2,
+	"blame" => \&git_blame,
 	"blobdiff" => \&git_blobdiff,
 	"blobdiff_plain" => \&git_blobdiff_plain,
 	"blob" => \&git_blob,
@@ -1500,9 +1500,13 @@ sub git_cmd {
 	return $GIT, '--git-dir='.$git_dir;
 }
 
-# returns path to the core git executable and the --git-dir parameter as string
-sub git_cmd_str {
-	return join(' ', git_cmd());
+# quote the given arguments for passing them to the shell
+# quote_command("command", "arg 1", "arg with ' and ! characters")
+# => "'command' 'arg 1' 'arg with '\'' and '\!' characters'"
+# Try to avoid using this function wherever possible.
+sub quote_command {
+	return join(' ',
+		    map( { my $a = $_; $a =~ s/(['!])/'\\$1'/g; "'$a'" } @_ ));
 }
 
 # get HEAD ref of given project as hash
@@ -2156,49 +2160,6 @@ sub parse_commits {
 	close $fd;
 
 	return wantarray ? @cos : \@cos;
-}
-
-# parse ref from ref_file, given by ref_id, with given type
-sub parse_ref {
-	my $ref_file = shift;
-	my $ref_id = shift;
-	my $type = shift || git_get_type($ref_id);
-	my %ref_item;
-
-	$ref_item{'type'} = $type;
-	$ref_item{'id'} = $ref_id;
-	$ref_item{'epoch'} = 0;
-	$ref_item{'age'} = "unknown";
-	if ($type eq "tag") {
-		my %tag = parse_tag($ref_id);
-		$ref_item{'comment'} = $tag{'comment'};
-		if ($tag{'type'} eq "commit") {
-			my %co = parse_commit($tag{'object'});
-			$ref_item{'epoch'} = $co{'committer_epoch'};
-			$ref_item{'age'} = $co{'age_string'};
-		} elsif (defined($tag{'epoch'})) {
-			my $age = time - $tag{'epoch'};
-			$ref_item{'epoch'} = $tag{'epoch'};
-			$ref_item{'age'} = age_string($age);
-		}
-		$ref_item{'reftype'} = $tag{'type'};
-		$ref_item{'name'} = $tag{'name'};
-		$ref_item{'refid'} = $tag{'object'};
-	} elsif ($type eq "commit"){
-		my %co = parse_commit($ref_id);
-		$ref_item{'reftype'} = "commit";
-		$ref_item{'name'} = $ref_file;
-		$ref_item{'title'} = $co{'title'};
-		$ref_item{'refid'} = $ref_id;
-		$ref_item{'epoch'} = $co{'committer_epoch'};
-		$ref_item{'age'} = $co{'age_string'};
-	} else {
-		$ref_item{'reftype'} = $type;
-		$ref_item{'name'} = $ref_file;
-		$ref_item{'refid'} = $ref_id;
-	}
-
-	return %ref_item;
 }
 
 # parse line of git-diff-tree "raw" output
@@ -3559,21 +3520,24 @@ sub git_patchset_body {
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 
-sub git_project_list_body {
-	my ($projlist, $order, $from, $to, $extra, $no_header) = @_;
-
-	my ($check_forks) = gitweb_check_feature('forks');
-
+# fills project list info (age, description, owner, forks) for each
+# project in the list, removing invalid projects from returned list
+# NOTE: modifies $projlist, but does not remove entries from it
+sub fill_project_list_info {
+	my ($projlist, $check_forks) = @_;
 	my @projects;
+
+ PROJECT:
 	foreach my $pr (@$projlist) {
-		my (@aa) = git_get_last_activity($pr->{'path'});
-		unless (@aa) {
-			next;
+		my (@activity) = git_get_last_activity($pr->{'path'});
+		unless (@activity) {
+			next PROJECT;
 		}
-		($pr->{'age'}, $pr->{'age_string'}) = @aa;
+		($pr->{'age'}, $pr->{'age_string'}) = @activity;
 		if (!defined $pr->{'descr'}) {
 			my $descr = git_get_project_description($pr->{'path'}) || "";
-			$pr->{'descr_long'} = to_utf8($descr);
+			$descr = to_utf8($descr);
+			$pr->{'descr_long'} = $descr;
 			$pr->{'descr'} = chop_str($descr, $projects_list_description_width, 5);
 		}
 		if (!defined $pr->{'owner'}) {
@@ -3585,13 +3549,51 @@ sub git_project_list_body {
 			    ($pname !~ /\/$/) &&
 			    (-d "$projectroot/$pname")) {
 				$pr->{'forks'} = "-d $projectroot/$pname";
-			}
-			else {
+			}	else {
 				$pr->{'forks'} = 0;
 			}
 		}
 		push @projects, $pr;
 	}
+
+	return @projects;
+}
+
+# print 'sort by' <th> element, either sorting by $key if $name eq $order
+# (changing $list), or generating 'sort by $name' replay link otherwise
+sub print_sort_th {
+	my ($str_sort, $name, $order, $key, $header, $list) = @_;
+	$key    ||= $name;
+	$header ||= ucfirst($name);
+
+	if ($order eq $name) {
+		if ($str_sort) {
+			@$list = sort {$a->{$key} cmp $b->{$key}} @$list;
+		} else {
+			@$list = sort {$a->{$key} <=> $b->{$key}} @$list;
+		}
+		print "<th>$header</th>\n";
+	} else {
+		print "<th>" .
+		      $cgi->a({-href => href(-replay=>1, order=>$name),
+		               -class => "header"}, $header) .
+		      "</th>\n";
+	}
+}
+
+sub print_sort_th_str {
+	print_sort_th(1, @_);
+}
+
+sub print_sort_th_num {
+	print_sort_th(0, @_);
+}
+
+sub git_project_list_body {
+	my ($projlist, $order, $from, $to, $extra, $no_header) = @_;
+
+	my ($check_forks) = gitweb_check_feature('forks');
+	my @projects = fill_project_list_info($projlist, $check_forks);
 
 	$order ||= $default_projects_order;
 	$from = 0 unless defined $from;
@@ -3603,43 +3605,15 @@ sub git_project_list_body {
 		if ($check_forks) {
 			print "<th></th>\n";
 		}
-		if ($order eq "project") {
-			@projects = sort {$a->{'path'} cmp $b->{'path'}} @projects;
-			print "<th>Project</th>\n";
-		} else {
-			print "<th>" .
-			      $cgi->a({-href => href(project=>undef, order=>'project'),
-			               -class => "header"}, "Project") .
-			      "</th>\n";
-		}
-		if ($order eq "descr") {
-			@projects = sort {$a->{'descr'} cmp $b->{'descr'}} @projects;
-			print "<th>Description</th>\n";
-		} else {
-			print "<th>" .
-			      $cgi->a({-href => href(project=>undef, order=>'descr'),
-			               -class => "header"}, "Description") .
-			      "</th>\n";
-		}
-		if ($order eq "owner") {
-			@projects = sort {$a->{'owner'} cmp $b->{'owner'}} @projects;
-			print "<th>Owner</th>\n";
-		} else {
-			print "<th>" .
-			      $cgi->a({-href => href(project=>undef, order=>'owner'),
-			               -class => "header"}, "Owner") .
-			      "</th>\n";
-		}
-		if ($order eq "age") {
-			@projects = sort {$a->{'age'} <=> $b->{'age'}} @projects;
-			print "<th>Last Change</th>\n";
-		} else {
-			print "<th>" .
-			      $cgi->a({-href => href(project=>undef, order=>'age'),
-			               -class => "header"}, "Last Change") .
-			      "</th>\n";
-		}
-		print "<th></th>\n" .
+		print_sort_th_str('project', $order, 'path',
+		                  'Project', \@projects);
+		print_sort_th_str('descr', $order, 'descr_long',
+		                  'Description', \@projects);
+		print_sort_th_str('owner', $order, 'owner',
+		                  'Owner', \@projects);
+		print_sort_th_num('age', $order, 'age',
+		                  'Last Change', \@projects);
+		print "<th></th>\n" . # for links
 		      "</tr>\n";
 	}
 	my $alternate = 1;
@@ -4152,7 +4126,7 @@ sub git_tag {
 	git_footer_html();
 }
 
-sub git_blame2 {
+sub git_blame {
 	my $fd;
 	my $ftype;
 
@@ -4257,103 +4231,6 @@ HTML
 	print "</div>";
 	close $fd
 		or print "Reading blob failed\n";
-	git_footer_html();
-}
-
-sub git_blame {
-	my $fd;
-
-	my ($have_blame) = gitweb_check_feature('blame');
-	if (!$have_blame) {
-		die_error('403 Permission denied', "Permission denied");
-	}
-	die_error('404 Not Found', "File name not defined") if (!$file_name);
-	$hash_base ||= git_get_head_hash($project);
-	die_error(undef, "Couldn't find base commit") unless ($hash_base);
-	my %co = parse_commit($hash_base)
-		or die_error(undef, "Reading commit failed");
-	if (!defined $hash) {
-		$hash = git_get_hash_by_path($hash_base, $file_name, "blob")
-			or die_error(undef, "Error lookup file");
-	}
-	open ($fd, "-|", git_cmd(), "annotate", '-l', '-t', '-r', $file_name, $hash_base)
-		or die_error(undef, "Open git-annotate failed");
-	git_header_html();
-	my $formats_nav =
-		$cgi->a({-href => href(action=>"blob", hash=>$hash, hash_base=>$hash_base, file_name=>$file_name)},
-		        "blob") .
-		" | " .
-		$cgi->a({-href => href(action=>"history", hash=>$hash, hash_base=>$hash_base, file_name=>$file_name)},
-			"history") .
-		" | " .
-		$cgi->a({-href => href(action=>"blame", file_name=>$file_name)},
-		        "HEAD");
-	git_print_page_nav('','', $hash_base,$co{'tree'},$hash_base, $formats_nav);
-	git_print_header_div('commit', esc_html($co{'title'}), $hash_base);
-	git_print_page_path($file_name, 'blob', $hash_base);
-	print "<div class=\"page_body\">\n";
-	print <<HTML;
-<table class="blame">
-  <tr>
-    <th>Commit</th>
-    <th>Age</th>
-    <th>Author</th>
-    <th>Line</th>
-    <th>Data</th>
-  </tr>
-HTML
-	my @line_class = (qw(light dark));
-	my $line_class_len = scalar (@line_class);
-	my $line_class_num = $#line_class;
-	while (my $line = <$fd>) {
-		my $long_rev;
-		my $short_rev;
-		my $author;
-		my $time;
-		my $lineno;
-		my $data;
-		my $age;
-		my $age_str;
-		my $age_class;
-
-		chomp $line;
-		$line_class_num = ($line_class_num + 1) % $line_class_len;
-
-		if ($line =~ m/^([0-9a-fA-F]{40})\t\(\s*([^\t]+)\t(\d+) [+-]\d\d\d\d\t(\d+)\)(.*)$/) {
-			$long_rev = $1;
-			$author   = $2;
-			$time     = $3;
-			$lineno   = $4;
-			$data     = $5;
-		} else {
-			print qq(  <tr><td colspan="5" class="error">Unable to parse: $line</td></tr>\n);
-			next;
-		}
-		$short_rev  = substr ($long_rev, 0, 8);
-		$age        = time () - $time;
-		$age_str    = age_string ($age);
-		$age_str    =~ s/ /&nbsp;/g;
-		$age_class  = age_class($age);
-		$author     = esc_html ($author);
-		$author     =~ s/ /&nbsp;/g;
-
-		$data = untabify($data);
-		$data = esc_html ($data);
-
-		print <<HTML;
-  <tr class="$line_class[$line_class_num]">
-    <td class="sha1"><a href="${\href (action=>"commit", hash=>$long_rev)}" class="text">$short_rev..</a></td>
-    <td class="$age_class">$age_str</td>
-    <td>$author</td>
-    <td class="linenr"><a id="$lineno" href="#$lineno" class="linenr">$lineno</a></td>
-    <td class="pre">$data</td>
-  </tr>
-HTML
-	} # while (my $line = <$fd>)
-	print "</table>\n\n";
-	close $fd
-		or print "Reading blob failed.\n";
-	print "</div>";
 	git_footer_html();
 }
 
@@ -4633,7 +4510,6 @@ sub git_snapshot {
 		$hash = git_get_head_hash($project);
 	}
 
-	my $git_command = git_cmd_str();
 	my $name = $project;
 	$name =~ s,([^/])/*\.git$,$1,;
 	$name = basename($name);
@@ -4641,11 +4517,12 @@ sub git_snapshot {
 	$name =~ s/\047/\047\\\047\047/g;
 	my $cmd;
 	$filename .= "-$hash$known_snapshot_formats{$format}{'suffix'}";
-	$cmd = "$git_command archive " .
-		"--format=$known_snapshot_formats{$format}{'format'} " .
-		"--prefix=\'$name\'/ $hash";
+	$cmd = quote_command(
+		git_cmd(), 'archive',
+		"--format=$known_snapshot_formats{$format}{'format'}",
+		"--prefix=$name/", $hash);
 	if (exists $known_snapshot_formats{$format}{'compressor'}) {
-		$cmd .= ' | ' . join ' ', @{$known_snapshot_formats{$format}{'compressor'}};
+		$cmd .= ' | ' . quote_command(@{$known_snapshot_formats{$format}{'compressor'}});
 	}
 
 	print $cgi->header(
@@ -4858,8 +4735,8 @@ sub git_object {
 	if ($hash || ($hash_base && !defined $file_name)) {
 		my $object_id = $hash || $hash_base;
 
-		my $git_command = git_cmd_str();
-		open my $fd, "-|", "$git_command cat-file -t $object_id 2>/dev/null"
+		open my $fd, "-|", quote_command(
+			git_cmd(), 'cat-file', '-t', $object_id) . ' 2> /dev/null'
 			or die_error('404 Not Found', "Object does not exist");
 		$type = <$fd>;
 		chomp $type;

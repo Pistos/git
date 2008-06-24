@@ -514,9 +514,15 @@ const char *diff_get_color(int diff_use_color, enum color_diff ix)
 
 static void emit_line(FILE *file, const char *set, const char *reset, const char *line, int len)
 {
+	int has_trailing_newline = (len > 0 && line[len-1] == '\n');
+	if (has_trailing_newline)
+		len--;
+
 	fputs(set, file);
 	fwrite(line, len, 1, file);
 	fputs(reset, file);
+	if (has_trailing_newline)
+		fputc('\n', file);
 }
 
 static void emit_add_line(const char *reset, struct emit_callback *ecbdata, const char *line, int len)
@@ -922,7 +928,8 @@ static void show_stats(struct diffstat_t* data, struct diff_options *options)
 			total = add + del;
 		}
 		show_name(options->file, prefix, name, len, reset, set);
-		fprintf(options->file, "%5d ", added + deleted);
+		fprintf(options->file, "%5d%s", added + deleted,
+				added + deleted ? " " : "");
 		show_graph(options->file, '+', add, add_c, reset);
 		show_graph(options->file, '-', del, del_c, reset);
 		fprintf(options->file, "\n");

@@ -311,7 +311,6 @@ extern char *git_work_tree_cfg;
 extern int is_inside_work_tree(void);
 extern const char *get_git_dir(void);
 extern char *get_object_directory(void);
-extern char *get_refs_directory(void);
 extern char *get_index_file(void);
 extern char *get_graft_file(void);
 extern int set_git_dir(const char *path);
@@ -525,6 +524,7 @@ static inline int is_absolute_path(const char *path)
 }
 const char *make_absolute_path(const char *path);
 const char *make_nonrelative_path(const char *path);
+const char *make_relative_path(const char *abs, const char *base);
 
 /* Read and unpack a sha1 file into memory, write memory to a sha1 file */
 extern int sha1_object_info(const unsigned char *, unsigned long *);
@@ -641,6 +641,8 @@ extern struct packed_git {
 	const void *index_data;
 	size_t index_size;
 	uint32_t num_objects;
+	uint32_t num_bad_objects;
+	unsigned char *bad_object_sha1;
 	int index_version;
 	time_t mtime;
 	int pack_fd;
@@ -694,8 +696,6 @@ extern struct ref **get_remote_heads(int in, struct ref **list, int nr_match, ch
 extern int server_supports(const char *feature);
 
 extern struct packed_git *parse_pack_index(unsigned char *sha1);
-extern struct packed_git *parse_pack_index_file(const unsigned char *sha1,
-						const char *idx_path);
 
 extern void prepare_packed_git(void);
 extern void reprepare_packed_git(void);
@@ -737,7 +737,6 @@ extern int git_config_set_multivar(const char *, const char *, const char *, int
 extern int git_config_rename_section(const char *, const char *);
 extern const char *git_etc_gitconfig(void);
 extern int check_repository_format_version(const char *var, const char *value, void *cb);
-extern int git_env_bool(const char *, int);
 extern int git_config_system(void);
 extern int git_config_global(void);
 extern int config_error_nonbool(const char *);

@@ -761,6 +761,10 @@ _git_log ()
 			--pretty= --name-status --name-only --raw
 			--not --all
 			--left-right --cherry-pick
+			--graph
+			--stat --numstat --shortstat
+			--decorate --diff-filter=
+			--color-words --walk-reflogs
 			"
 		return
 		;;
