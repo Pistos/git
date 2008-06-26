@@ -14,7 +14,7 @@ static int transfer_unpack_limit = -1;
 static int fetch_unpack_limit = -1;
 static int unpack_limit = 100;
 static struct fetch_pack_args args = {
-	/* .uploadpack = */ "git upload-pack",
+	/* .uploadpack = */ "git-upload-pack",
 };
 
 static const char fetch_pack_usage[] =

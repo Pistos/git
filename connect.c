@@ -567,8 +567,6 @@ struct child_process *git_connect(int fd[2], const char *url_orig,
 		 * cannot connect.
 		 */
 		char *target_host = xstrdup(host);
-		const char *program_prefix = "";
-
 		if (git_use_proxy(host))
 			git_proxy_connect(fd, host);
 		else
@@ -577,13 +575,9 @@ struct child_process *git_connect(int fd[2], const char *url_orig,
 		 * Separate original protocol components prog and path
 		 * from extended components with a NUL byte.
 		 */
-		if (!prefixcmp(prog, "git ")) {
-			program_prefix = "git-";
-			prog += 4;
-		}
 		packet_write(fd[1],
-			     "%s%s %s%chost=%s%c",
-			     program_prefix, prog, path, 0,
+			     "%s %s%chost=%s%c",
+			     prog, path, 0,
 			     target_host, 0);
 		free(target_host);
 		free(url);

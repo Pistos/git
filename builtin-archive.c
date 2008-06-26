@@ -31,7 +31,7 @@ static int run_remote_archiver(const char *remote, int argc,
 	char *url, buf[LARGE_PACKET_MAX];
 	int fd[2], i, len, rv;
 	struct child_process *conn;
-	const char *exec = "git upload-archive";
+	const char *exec = "git-upload-archive";
 	int exec_at = 0;
 
 	for (i = 1; i < argc; i++) {
