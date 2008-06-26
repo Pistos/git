@@ -36,7 +36,7 @@ static int option_quiet, option_no_checkout, option_bare;
 static int option_local, option_no_hardlinks, option_shared;
 static char *option_template, *option_reference, *option_depth;
 static char *option_origin = NULL;
-static char *option_upload_pack = "git upload-pack";
+static char *option_upload_pack = "git-upload-pack";
 
 static struct option builtin_clone_options[] = {
 	OPT__QUIET(&option_quiet),

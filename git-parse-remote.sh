@@ -255,10 +255,10 @@ get_uploadpack () {
 	case "$data_source" in
 	config)
 		uplp=$(git config --get "remote.$1.uploadpack")
-		echo ${uplp:-git upload-pack}
+		echo ${uplp:-git-upload-pack}
 		;;
 	*)
-		echo "git upload-pack"
+		echo "git-upload-pack"
 		;;
 	esac
 }

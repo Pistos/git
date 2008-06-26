@@ -762,10 +762,10 @@ struct transport *transport_get(struct remote *remote, const char *url)
 
 		data->thin = 1;
 		data->conn = NULL;
-		data->uploadpack = "git upload-pack";
+		data->uploadpack = "git-upload-pack";
 		if (remote && remote->uploadpack)
 			data->uploadpack = remote->uploadpack;
-		data->receivepack = "git receive-pack";
+		data->receivepack = "git-receive-pack";
 		if (remote && remote->receivepack)
 			data->receivepack = remote->receivepack;
 	}
