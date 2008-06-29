@@ -1407,12 +1407,6 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 		if (8 < namelen &&
 		    !strcmp(argv[0] + namelen - 8, "-subtree"))
 			merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
-		else if (5 < namelen &&
-			 !strcmp(argv[0] + namelen - 5, "-ours"))
-			merge_recursive_variants = MERGE_RECURSIVE_OURS;
-		else if (7 < namelen &&
-			 !strcmp(argv[0] + namelen - 7, "-theirs"))
-			merge_recursive_variants = MERGE_RECURSIVE_THEIRS;
 	}
 
 	git_config(merge_config, NULL);
@@ -1423,8 +1417,21 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 		die("Usage: %s <base>... -- <head> <remote> ...\n", argv[0]);
 
 	for (i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "--"))
-			break;
+		const char *arg = argv[i];
+
+		if (!prefixcmp(arg, "--")) {
+			if (!arg[2])
+				break;
+			if (!strcmp(arg+2, "ours"))
+				merge_recursive_variants = MERGE_RECURSIVE_OURS;
+			else if (!strcmp(arg+2, "theirs"))
+				merge_recursive_variants = MERGE_RECURSIVE_THEIRS;
+			else if (!strcmp(arg+2, "subtree"))
+				merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
+			else
+				die("Unknown option %s", arg);
+			continue;
+		}
 		if (bases_count < sizeof(bases)/sizeof(*bases))
 			bases[bases_count++] = argv[i];
 	}

@@ -35,7 +35,7 @@ test_expect_success 'plain recursive - should conflict' '
 
 test_expect_success 'recursive favouring theirs' '
 	git reset --hard master &&
-	git merge -s recursive-theirs side &&
+	git merge -s recursive -Xtheirs side &&
 	! grep nine file &&
 	grep nueve file &&
 	! grep 9 file &&
@@ -45,7 +45,7 @@ test_expect_success 'recursive favouring theirs' '
 
 test_expect_success 'recursive favouring ours' '
 	git reset --hard master &&
-	git merge -s recursive-ours side &&
+	git merge -s recursive -Xours side &&
 	grep nine file &&
 	! grep nueve file &&
 	! grep 9 file &&
