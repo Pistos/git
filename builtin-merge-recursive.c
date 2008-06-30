@@ -20,7 +20,11 @@
 #include "attr.h"
 #include "merge-recursive.h"
 
-static int subtree_merge;
+static enum {
+	MERGE_RECURSIVE_SUBTREE = 1,
+	MERGE_RECURSIVE_OURS,
+	MERGE_RECURSIVE_THEIRS,
+} merge_recursive_variants;
 
 static struct tree *shift_tree_object(struct tree *one, struct tree *two)
 {
@@ -633,6 +637,7 @@ static int merge_3way(mmbuffer_t *result_buf,
 	mmfile_t orig, src1, src2;
 	char *name1, *name2;
 	int merge_status;
+	int flag, favor;
 
 	name1 = xstrdup(mkpath("%s:%s", branch1, a->path));
 	name2 = xstrdup(mkpath("%s:%s", branch2, b->path));
@@ -641,9 +646,26 @@ static int merge_3way(mmbuffer_t *result_buf,
 	fill_mm(a->sha1, &src1);
 	fill_mm(b->sha1, &src2);
 
+	if (index_only)
+		favor = 0;
+	else {
+		switch (merge_recursive_variants) {
+		case MERGE_RECURSIVE_OURS:
+			favor = XDL_MERGE_FAVOR_OURS;
+			break;
+		case MERGE_RECURSIVE_THEIRS:
+			favor = XDL_MERGE_FAVOR_THEIRS;
+			break;
+		default:
+			favor = 0;
+			break;
+		}
+	}
+	flag = LL_MERGE_FLAGS(index_only, favor);
+
 	merge_status = ll_merge(result_buf, a->path, &orig,
 				&src1, name1, &src2, name2,
-				index_only);
+				flag);
 
 	free(name1);
 	free(name2);
@@ -1162,7 +1184,7 @@ int merge_trees(struct tree *head,
 {
 	int code, clean;
 
-	if (subtree_merge) {
+	if (merge_recursive_variants == MERGE_RECURSIVE_SUBTREE) {
 		merge = shift_tree_object(head, merge);
 		common = shift_tree_object(head, common);
 	}
@@ -1370,11 +1392,12 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 	struct lock_file *lock = xcalloc(1, sizeof(struct lock_file));
 	int index_fd;
 
+	merge_recursive_variants = 0;
 	if (argv[0]) {
 		int namelen = strlen(argv[0]);
 		if (8 < namelen &&
 		    !strcmp(argv[0] + namelen - 8, "-subtree"))
-			subtree_merge = 1;
+			merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
 	}
 
 	git_config(merge_config, NULL);
@@ -1385,8 +1408,21 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 		die("Usage: %s <base>... -- <head> <remote> ...\n", argv[0]);
 
 	for (i = 1; i < argc; ++i) {
-		if (!strcmp(argv[i], "--"))
-			break;
+		const char *arg = argv[i];
+
+		if (!prefixcmp(arg, "--")) {
+			if (!arg[2])
+				break;
+			if (!strcmp(arg+2, "ours"))
+				merge_recursive_variants = MERGE_RECURSIVE_OURS;
+			else if (!strcmp(arg+2, "theirs"))
+				merge_recursive_variants = MERGE_RECURSIVE_THEIRS;
+			else if (!strcmp(arg+2, "subtree"))
+				merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
+			else
+				die("Unknown option %s", arg);
+			continue;
+		}
 		if (bases_count < sizeof(bases)/sizeof(*bases))
 			bases[bases_count++] = argv[i];
 	}
