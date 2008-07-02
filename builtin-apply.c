@@ -3252,10 +3252,10 @@ int cmd_apply(int argc, const char **argv, const char *unused_prefix)
 			options |= RECOUNT;
 			continue;
 		}
-		if (!strncmp(arg, "--root=", strlen("--root="))) {
+		if (!prefixcmp(arg, "--root=")) {
 			arg += strlen("--root=");
 			root_len = strlen(arg);
-			if (root_len && arg[root_len + 1] != '/') {
+			if (root_len && arg[root_len - 1] != '/') {
 				char *new_root;
 				root = new_root = xmalloc(root_len + 2);
 				strcpy(new_root, arg);
