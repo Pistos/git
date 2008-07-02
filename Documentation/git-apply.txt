@@ -14,7 +14,7 @@ SYNOPSIS
 	  [--allow-binary-replacement | --binary] [--reject] [-z]
 	  [-pNUM] [-CNUM] [--inaccurate-eof] [--recount] [--cached]
 	  [--whitespace=<nowarn|warn|fix|error|error-all>]
-	  [--exclude=PATH] [--verbose] [<patch>...]
+	  [--exclude=PATH] [--root=<root>] [--verbose] [<patch>...]
 
 DESCRIPTION
 -----------
@@ -181,6 +181,10 @@ behavior:
 	Do not trust the line counts in the hunk headers, but infer them
 	by inspecting the patch (e.g. after editing the patch without
 	adjusting the hunk headers appropriately).
+
+--root=<root>::
+	Prepend <root> to all filenames.  If a "-p" argument was passed, too,
+	it is applied before prepending the new root.
 
 Configuration
 -------------
