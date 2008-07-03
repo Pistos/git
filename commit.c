@@ -101,6 +101,13 @@ static int commit_graft_pos(const unsigned char *sha1)
 	return -lo - 1;
 }
 
+void for_each_commit_graft(void (*fn)(struct commit_graft *))
+{
+	int i;
+	for (i = 0; i < commit_graft_nr; i++)
+		fn(commit_graft[i]);
+}
+
 int register_commit_graft(struct commit_graft *graft, int ignore_dups)
 {
 	int pos = commit_graft_pos(graft->sha1);
@@ -196,7 +203,10 @@ static void prepare_commit_graft(void)
 struct commit_graft *lookup_commit_graft(const unsigned char *sha1)
 {
 	int pos;
+
 	prepare_commit_graft();
+	if (!honor_graft)
+		return NULL;
 	pos = commit_graft_pos(sha1);
 	if (pos < 0)
 		return NULL;

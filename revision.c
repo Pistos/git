@@ -991,6 +991,10 @@ int setup_revisions(int argc, const char **argv, struct rev_info *revs, const ch
 		const char *arg = argv[i];
 		if (*arg == '-') {
 			int opts;
+			if (!strcmp(arg, "--ignore-graft")) {
+				honor_graft = 0;
+				continue;
+			}
 			if (!prefixcmp(arg, "--max-count=")) {
 				revs->max_count = atoi(arg + 12);
 				continue;

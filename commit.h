@@ -138,4 +138,6 @@ static inline int single_parent(struct commit *commit)
 	return commit->parents && !commit->parents->next;
 }
 
+void for_each_commit_graft(void (*fn)(struct commit_graft *));
+
 #endif /* COMMIT_H */
