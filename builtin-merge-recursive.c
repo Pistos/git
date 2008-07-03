@@ -21,20 +21,23 @@
 #include "merge-recursive.h"
 
 static enum {
-	MERGE_RECURSIVE_SUBTREE = 1,
+	MERGE_RECURSIVE_NORMAL = 1,
 	MERGE_RECURSIVE_OURS,
 	MERGE_RECURSIVE_THEIRS,
 } merge_recursive_variants;
+
+static const char *subtree_shift;
 
 static struct tree *shift_tree_object(struct tree *one, struct tree *two)
 {
 	unsigned char shifted[20];
 
-	/*
-	 * NEEDSWORK: this limits the recursion depth to hardcoded
-	 * value '2' to avoid excessive overhead.
-	 */
-	shift_tree(one->object.sha1, two->object.sha1, shifted, 2);
+	if (!*subtree_shift) {
+		shift_tree(one->object.sha1, two->object.sha1, shifted, 0);
+	} else {
+		shift_tree_by(one->object.sha1, two->object.sha1, shifted,
+			      subtree_shift);
+	}
 	if (!hashcmp(two->object.sha1, shifted))
 		return two;
 	return lookup_tree(shifted);
@@ -1184,7 +1187,7 @@ int merge_trees(struct tree *head,
 {
 	int code, clean;
 
-	if (merge_recursive_variants == MERGE_RECURSIVE_SUBTREE) {
+	if (subtree_shift) {
 		merge = shift_tree_object(head, merge);
 		common = shift_tree_object(head, common);
 	}
@@ -1393,11 +1396,12 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 	int index_fd;
 
 	merge_recursive_variants = 0;
+	subtree_shift = NULL;
 	if (argv[0]) {
 		int namelen = strlen(argv[0]);
 		if (8 < namelen &&
 		    !strcmp(argv[0] + namelen - 8, "-subtree"))
-			merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
+			subtree_shift = "";
 	}
 
 	git_config(merge_config, NULL);
@@ -1418,7 +1422,9 @@ int cmd_merge_recursive(int argc, const char **argv, const char *prefix)
 			else if (!strcmp(arg+2, "theirs"))
 				merge_recursive_variants = MERGE_RECURSIVE_THEIRS;
 			else if (!strcmp(arg+2, "subtree"))
-				merge_recursive_variants = MERGE_RECURSIVE_SUBTREE;
+				subtree_shift = "";
+			else if (!prefixcmp(arg+2, "subtree="))
+				subtree_shift = arg + 10;
 			else
 				die("Unknown option %s", arg);
 			continue;

@@ -17,6 +17,7 @@ test -z "$(git ls-files -u)" ||
 	die "You are in the middle of a conflicted merge."
 
 strategy_args= no_stat= no_commit= squash= no_ff= log_arg=
+merge_args=
 curr_branch=$(git symbolic-ref -q HEAD)
 curr_branch_short=$(echo "$curr_branch" | sed "s|refs/heads/||")
 rebase=$(git config --bool branch.$curr_branch_short.rebase)
@@ -54,6 +55,9 @@ do
 			shift ;;
 		esac
 		strategy_args="${strategy_args}-s $strategy "
+		;;
+	-X*)
+		merge_args="$merge_args$1 "
 		;;
 	-r|--r|--re|--reb|--reba|--rebas|--rebase)
 		rebase=true
