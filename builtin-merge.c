@@ -21,6 +21,7 @@
 #include "utf8.h"
 #include "log-tree.h"
 #include "color.h"
+#include "path-list.h"
 
 #define DEFAULT_TWOHEAD (1<<0)
 #define DEFAULT_OCTOPUS (1<<1)
@@ -47,6 +48,7 @@ static unsigned char head[20], stash[20];
 static struct strategy **use_strategies;
 static size_t use_strategies_nr, use_strategies_alloc;
 static const char *branch;
+static struct path_list X_options;
 
 static struct strategy all_strategy[] = {
 	{ "recur",      NO_TRIVIAL },
@@ -439,6 +441,27 @@ static void merge_name(const char *remote, struct strbuf *msg)
 		sha1_to_hex(remote_head->sha1), remote);
 }
 
+/*
+ * NEEDSWORK:
+ * This should be renamed and moved to parse-options.[ch]
+ */
+#define USAGE_OPTS_WIDTH 24
+#define USAGE_GAP 2
+static void pad_and_emit_usage(const char *opt, const char *help)
+{
+	int pos, pad;
+
+	pos = fprintf(stderr, "    ");
+	pos += fprintf(stderr, opt);
+	if (pos <= USAGE_OPTS_WIDTH)
+		pad = USAGE_OPTS_WIDTH - pos;
+	else {
+		fputc('\n', stderr);
+		pad = USAGE_OPTS_WIDTH;
+	}
+	fprintf(stderr, "%*s%s\n", pad + USAGE_GAP, "", help);
+}
+
 static void handle_merge_options(int *argc, const char ***argv)
 {
 	struct parse_opt_ctx_t ctx;
@@ -453,21 +476,18 @@ static void handle_merge_options(int *argc, const char ***argv)
 		if (step == PARSE_OPT_DONE)
 			break;
 		if (step != PARSE_OPT_HELP) {
-			/*
-			 * check and consume our own options here, like so:
-			 *
-			 * if (!prefixcmp(ctx.argv[0], "-X")) {
-			 *	   ...
-			 *	   consumed = 1;
-			 * }
-			 *
-			 */
-			;
+			 if (!prefixcmp(ctx.argv[0], "-X")) {
+				 char *opt = strdup(ctx.argv[0]);
+				 opt[1] = '-'; /* turn -X<option> into --<option> */
+				 path_list_append(opt, &X_options);
+				 consumed = 1;
+			 }
 		}
 		if (!consumed) {
 			error("unknown option '%s'", ctx.argv[0]);
 			parse_options_usage(usage, options);
-			/* describe our additional options here... */
+			pad_and_emit_usage("-X<option>",
+					   "pass merge strategy specific options");
 			exit(129);
 		}
 		ctx.argv += consumed;
@@ -549,15 +569,20 @@ static int try_merge_strategy(const char *strategy, struct commit_list *common,
 			      const char *head_arg)
 {
 	const char **args;
-	int i = 0, ret;
+	int i = 0, ret, cnt;
 	struct commit_list *j;
 	struct strbuf buf;
 
-	args = xmalloc((4 + commit_list_count(common) +
-			commit_list_count(remoteheads)) * sizeof(char *));
+	args = xcalloc(4 + /* git-merge-X, --, HEAD and NULL */
+		       X_options.nr +
+		       commit_list_count(common) +
+		       commit_list_count(remoteheads),
+		       sizeof(char *));
 	strbuf_init(&buf, 0);
 	strbuf_addf(&buf, "merge-%s", strategy);
 	args[i++] = buf.buf;
+	for (cnt = 0; cnt < X_options.nr; cnt++)
+		args[i++] = X_options.items[cnt].path;
 	for (j = common; j; j = j->next)
 		args[i++] = xstrdup(sha1_to_hex(j->item->object.sha1));
 	args[i++] = "--";
@@ -567,7 +592,7 @@ static int try_merge_strategy(const char *strategy, struct commit_list *common,
 	args[i] = NULL;
 	ret = run_command_v_opt(args, RUN_GIT_CMD);
 	strbuf_release(&buf);
-	i = 1;
+	i = 1 + X_options.nr;
 	for (j = common; j; j = j->next)
 		free((void *)args[i++]);
 	i += 2;

@@ -33,7 +33,7 @@ test_expect_success 'plain recursive - should conflict' '
 	! grep 1 file
 '
 
-test_expect_failure 'recursive favouring theirs' '
+test_expect_success 'recursive favouring theirs' '
 	git reset --hard master &&
 	git merge -s recursive -Xtheirs side &&
 	! grep nine file &&
@@ -43,7 +43,7 @@ test_expect_failure 'recursive favouring theirs' '
 	! grep 1 file
 '
 
-test_expect_failure 'recursive favouring ours' '
+test_expect_success 'recursive favouring ours' '
 	git reset --hard master &&
 	git merge -s recursive -Xours side &&
 	grep nine file &&
