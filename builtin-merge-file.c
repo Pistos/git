@@ -4,7 +4,7 @@
 #include "xdiff-interface.h"
 
 static const char merge_file_usage[] =
-"git merge-file [-p | --stdout] [-q | --quiet] [-L name1 [-L orig [-L name2]]] file1 orig_file file2";
+"git merge-file [-p | --stdout] [-q | --quiet] [--ours|--theirs] [-L name1 [-L orig [-L name2]]] file1 orig_file file2";
 
 int cmd_merge_file(int argc, const char **argv, const char *prefix)
 {
@@ -13,6 +13,7 @@ int cmd_merge_file(int argc, const char **argv, const char *prefix)
 	mmbuffer_t result = {NULL, 0};
 	xpparam_t xpp = {XDF_NEED_MINIMAL};
 	int ret = 0, i = 0, to_stdout = 0;
+	int flags, favor = 0;
 
 	while (argc > 4) {
 		if (!strcmp(argv[1], "-L") && i < 3) {
@@ -25,6 +26,10 @@ int cmd_merge_file(int argc, const char **argv, const char *prefix)
 		else if (!strcmp(argv[1], "-q") ||
 				!strcmp(argv[1], "--quiet"))
 			freopen("/dev/null", "w", stderr);
+		else if (!strcmp(argv[1], "--ours"))
+			favor = XDL_MERGE_FAVOR_OURS;
+		else if (!strcmp(argv[1], "--theirs"))
+			favor = XDL_MERGE_FAVOR_THEIRS;
 		else
 			usage(merge_file_usage);
 		argc--;
@@ -45,8 +50,9 @@ int cmd_merge_file(int argc, const char **argv, const char *prefix)
 					argv[i + 1]);
 	}
 
+	flags = XDL_MERGE_FLAGS(XDL_MERGE_ZEALOUS_ALNUM, favor);
 	ret = xdl_merge(mmfs + 1, mmfs + 0, names[0], mmfs + 2, names[2],
-			&xpp, XDL_MERGE_ZEALOUS_ALNUM, &result);
+			&xpp, flags, &result);
 
 	for (i = 0; i < 3; i++)
 		free(mmfs[i].ptr);

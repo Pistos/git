@@ -17,6 +17,7 @@ commit               perform a commit if the merge succeeds (default)
 ff                   allow fast forward (default)
 s,strategy=          merge strategy to use
 m,message=           message to be used for the merge commit (if any)
+X=                   pass merge strategy specific options
 "
 
 SUBDIRECTORY_OK=Yes
@@ -36,6 +37,7 @@ default_octopus_strategies='octopus'
 no_fast_forward_strategies='subtree ours'
 no_trivial_strategies='recursive recur subtree ours'
 use_strategies=
+backend_option=
 
 allow_fast_forward=t
 allow_trivial_merge=t
@@ -185,6 +187,10 @@ parse_config () {
 			shift
 			merge_msg="$1"
 			have_message=t
+			;;
+		-X)
+			shift
+			backend_option="$backend_option --$1"
 			;;
 		--)
 			shift
@@ -450,7 +456,7 @@ do
     # Remember which strategy left the state in the working tree
     wt_strategy=$strategy
 
-    git-merge-$strategy $common -- "$head_arg" "$@"
+    git-merge-$strategy $backend_option $common -- "$head_arg" "$@"
     exit=$?
     if test "$no_commit" = t && test "$exit" = 0
     then
