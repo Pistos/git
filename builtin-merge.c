@@ -439,6 +439,43 @@ static void merge_name(const char *remote, struct strbuf *msg)
 		sha1_to_hex(remote_head->sha1), remote);
 }
 
+static void handle_merge_options(int *argc, const char ***argv)
+{
+	struct parse_opt_ctx_t ctx;
+	const char * const *usage = builtin_merge_usage;
+	struct option *options = builtin_merge_options;
+
+	parse_options_start(&ctx, *argc, *argv, 0);
+	while (1) {
+		int consumed = 0;
+		int step = parse_options_step(&ctx, options, usage);
+
+		if (step == PARSE_OPT_DONE)
+			break;
+		if (step != PARSE_OPT_HELP) {
+			/*
+			 * check and consume our own options here, like so:
+			 *
+			 * if (!prefixcmp(ctx.argv[0], "-X")) {
+			 *	   ...
+			 *	   consumed = 1;
+			 * }
+			 *
+			 */
+			;
+		}
+		if (!consumed) {
+			error("unknown option '%s'", ctx.argv[0]);
+			parse_options_usage(usage, options);
+			/* describe our additional options here... */
+			exit(129);
+		}
+		ctx.argv += consumed;
+		ctx.argc -= consumed;
+	}
+	*argc = parse_options_end(&ctx);
+}
+
 int git_merge_config(const char *k, const char *v, void *cb)
 {
 	if (branch && !prefixcmp(k, "branch.") &&
@@ -453,9 +490,8 @@ int git_merge_config(const char *k, const char *v, void *cb)
 		argv = xrealloc(argv, sizeof(*argv) * (argc + 2));
 		memmove(argv + 1, argv, sizeof(*argv) * (argc + 1));
 		argc++;
-		parse_options(argc, argv, builtin_merge_options,
-			      builtin_merge_usage, 0);
-		free(buf);
+		handle_merge_options(&argc, &argv);
+		free(buf); /* Careful... */
 	}
 
 	if (!strcmp(k, "merge.diffstat") || !strcmp(k, "merge.stat"))
@@ -804,8 +840,7 @@ int cmd_merge(int argc, const char **argv, const char *prefix)
 	if (diff_use_color_default == -1)
 		diff_use_color_default = git_use_color_default;
 
-	argc = parse_options(argc, argv, builtin_merge_options,
-			builtin_merge_usage, 0);
+	handle_merge_options(&argc, &argv);
 
 	if (squash) {
 		if (!allow_fast_forward)
