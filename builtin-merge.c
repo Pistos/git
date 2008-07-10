@@ -22,6 +22,7 @@
 #include "log-tree.h"
 #include "color.h"
 #include "path-list.h"
+#include "rerere.h"
 
 #define DEFAULT_TWOHEAD (1<<0)
 #define DEFAULT_OCTOPUS (1<<1)
