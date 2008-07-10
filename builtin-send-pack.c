@@ -27,6 +27,7 @@ static int pack_objects(int fd, struct ref *refs)
 	 */
 	const char *argv[] = {
 		"pack-objects",
+		"--ignore-graft",
 		"--all-progress",
 		"--revs",
 		"--stdout",
@@ -36,7 +37,7 @@ static int pack_objects(int fd, struct ref *refs)
 	struct child_process po;
 
 	if (args.use_thin_pack)
-		argv[4] = "--thin";
+		argv[5] = "--thin";
 	memset(&po, 0, sizeof(po));
 	po.argv = argv;
 	po.in = -1;

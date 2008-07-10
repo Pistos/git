@@ -160,6 +160,7 @@ static void create_pack_file(void)
 		die("git-upload-pack: unable to fork git-rev-list");
 
 	argv[arg++] = "pack-objects";
+	argv[arg++] = "--ignore-graft";
 	argv[arg++] = "--stdout";
 	if (!no_progress)
 		argv[arg++] = "--progress";
@@ -616,6 +617,7 @@ int main(int argc, char **argv)
 	int i;
 	int strict = 0;
 
+	honor_graft = 0;
 	for (i = 1; i < argc; i++) {
 		char *arg = argv[i];
 

@@ -989,7 +989,9 @@ static int handle_revision_opt(struct rev_info *revs, int argc, const char **arg
 		return 0;
 	}
 
-	if (!prefixcmp(arg, "--max-count=")) {
+	if (!strcmp(arg, "--ignore-graft")) {
+		honor_graft = 0;
+	} else if (!prefixcmp(arg, "--max-count=")) {
 		revs->max_count = atoi(arg + 12);
 	} else if (!prefixcmp(arg, "--skip=")) {
 		revs->skip_count = atoi(arg + 7);

@@ -30,6 +30,7 @@ git-pack-objects [{ -q | --progress | --all-progress }] \n\
 	[--threads=N] [--non-empty] [--revs [--unpacked | --all]*] [--reflog] \n\
 	[--stdout | base-name] [--include-tag] \n\
 	[--keep-unreachable | --unpack-unreachable] \n\
+	[--ignore-graft] \n\
 	[<ref-list | <object-list]";
 
 struct object_entry {
@@ -2162,6 +2163,10 @@ int cmd_pack_objects(int argc, const char **argv, const char *prefix)
 				pack_idx_off32_limit = strtoul(c+1, &c, 0);
 			if (*c || pack_idx_off32_limit & 0x80000000)
 				die("bad %s", arg);
+			continue;
+		}
+		if (!strcmp(arg, "--ignore-graft")) {
+			honor_graft = 0;
 			continue;
 		}
 		usage(pack_usage);

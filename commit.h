@@ -140,5 +140,6 @@ static inline int single_parent(struct commit *commit)
 }
 
 struct commit_list *reduce_heads(struct commit_list *heads);
+void for_each_commit_graft(void (*fn)(struct commit_graft *));
 
 #endif /* COMMIT_H */
