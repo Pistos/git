@@ -9,7 +9,7 @@ git-push - Update remote refs along with associated objects
 SYNOPSIS
 --------
 [verse]
-'git-push' [--all] [--dry-run] [--tags] [--receive-pack=<git-receive-pack>]
+'git push' [--all] [--dry-run] [--tags] [--receive-pack=<git-receive-pack>]
            [--repo=all] [-f | --force] [-v | --verbose] [<repository> <refspec>...]
 
 DESCRIPTION
@@ -106,7 +106,7 @@ nor in any Push line of the corresponding remotes file---see below).
 
 --thin::
 --no-thin::
-	These options are passed to `git-send-pack`.  Thin
+	These options are passed to 'git-send-pack'.  Thin
 	transfer spends extra cycles to minimize the number of
 	objects to be sent and meant to be used on slower connection.
 

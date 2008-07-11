@@ -116,7 +116,7 @@ static void handle_object(const unsigned char *sha1)
 
 	mark_next_object(object);
 
-	printf("blob\nmark :%d\ndata %lu\n", last_idnum, size);
+	printf("blob\nmark :%"PRIu32"\ndata %lu\n", last_idnum, size);
 	if (size && fwrite(buf, size, 1, stdout) != 1)
 		die ("Could not write blob %s", sha1_to_hex(sha1));
 	printf("\n");
@@ -204,7 +204,7 @@ static void handle_commit(struct commit *commit, struct rev_info *rev)
 		reencoded = reencode_string(message, "UTF-8", encoding);
 	if (!commit->parents)
 		printf("reset %s\n", (const char*)commit->util);
-	printf("commit %s\nmark :%d\n%.*s\n%.*s\ndata %u\n%s",
+	printf("commit %s\nmark :%"PRIu32"\n%.*s\n%.*s\ndata %u\n%s",
 	       (const char *)commit->util, last_idnum,
 	       (int)(author_end - author), author,
 	       (int)(committer_end - committer), committer,
@@ -379,19 +379,19 @@ static void export_marks(char *file)
 	if (!f)
 		error("Unable to open marks file %s for writing", file);
 
-	for (i = 0; i < idnums.size; ++i) {
-		deco++;
-		if (deco && deco->base && deco->base->type == 1) {
+	for (i = 0; i < idnums.size; i++) {
+		if (deco->base && deco->base->type == 1) {
 			mark = ptr_to_mark(deco->decoration);
 			fprintf(f, ":%u %s\n", mark, sha1_to_hex(deco->base->sha1));
 		}
+		deco++;
 	}
 
 	if (ferror(f) || fclose(f))
 		error("Unable to write marks file %s.", file);
 }
 
-static void import_marks(char * input_file)
+static void import_marks(char *input_file)
 {
 	char line[512];
 	FILE *f = fopen(input_file, "r");
@@ -407,7 +407,7 @@ static void import_marks(char * input_file)
 		line_end = strchr(line, '\n');
 		if (line[0] != ':' || !line_end)
 			die("corrupt mark line: %s", line);
-		*line_end = 0;
+		*line_end = '\0';
 
 		mark = strtoumax(line + 1, &mark_end, 10);
 		if (!mark || mark_end == line + 1

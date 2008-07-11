@@ -391,6 +391,32 @@ static void pretty_print_string_list(struct cmdnames *cmds, int longest)
 	}
 }
 
+static int is_executable(const char *name)
+{
+	struct stat st;
+
+	if (stat(name, &st) || /* stat, not lstat */
+	    !S_ISREG(st.st_mode))
+		return 0;
+
+#ifdef __MINGW32__
+	/* cannot trust the executable bit, peek into the file instead */
+	char buf[3] = { 0 };
+	int n;
+	int fd = open(name, O_RDONLY);
+	st.st_mode &= ~S_IXUSR;
+	if (fd >= 0) {
+		n = read(fd, buf, 2);
+		if (n == 2)
+			/* DOS executables start with "MZ" */
+			if (!strcmp(buf, "#!") || !strcmp(buf, "MZ"))
+				st.st_mode |= S_IXUSR;
+		close(fd);
+	}
+#endif
+	return st.st_mode & S_IXUSR;
+}
+
 static unsigned int list_commands_in_dir(struct cmdnames *cmds,
 					 const char *path)
 {
@@ -404,15 +430,12 @@ static unsigned int list_commands_in_dir(struct cmdnames *cmds,
 		return 0;
 
 	while ((de = readdir(dir)) != NULL) {
-		struct stat st;
 		int entlen;
 
 		if (prefixcmp(de->d_name, prefix))
 			continue;
 
-		if (stat(de->d_name, &st) || /* stat, not lstat */
-		    !S_ISREG(st.st_mode) ||
-		    !(st.st_mode & S_IXUSR))
+		if (!is_executable(de->d_name))
 			continue;
 
 		entlen = strlen(de->d_name) - prefix_len;
@@ -447,7 +470,7 @@ static unsigned int load_command_list(void)
 
 	path = paths = xstrdup(env_path);
 	while (1) {
-		if ((colon = strchr(path, ':')))
+		if ((colon = strchr(path, PATH_SEP)))
 			*colon = 0;
 
 		len = list_commands_in_dir(&other_cmds, path);
@@ -527,20 +550,26 @@ static int is_git_command(const char *s)
 		is_in_cmdlist(&other_cmds, s);
 }
 
+static const char *prepend(const char *prefix, const char *cmd)
+{
+	size_t pre_len = strlen(prefix);
+	size_t cmd_len = strlen(cmd);
+	char *p = xmalloc(pre_len + cmd_len + 1);
+	memcpy(p, prefix, pre_len);
+	strcpy(p + pre_len, cmd);
+	return p;
+}
+
 static const char *cmd_to_page(const char *git_cmd)
 {
 	if (!git_cmd)
 		return "git";
 	else if (!prefixcmp(git_cmd, "git"))
 		return git_cmd;
-	else {
-		int page_len = strlen(git_cmd) + 4;
-		char *p = xmalloc(page_len + 1);
-		strcpy(p, "git-");
-		strcpy(p + 4, git_cmd);
-		p[page_len] = 0;
-		return p;
-	}
+	else if (is_git_command(git_cmd))
+		return prepend("git-", git_cmd);
+	else
+		return prepend("git", git_cmd);
 }
 
 static void setup_man_path(void)

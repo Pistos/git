@@ -4,8 +4,41 @@
 #define MAX_ARGS	32
 
 extern char **environ;
-static const char *builtin_exec_path = GIT_EXEC_PATH;
 static const char *argv_exec_path;
+
+static const char *builtin_exec_path(void)
+{
+#ifndef __MINGW32__
+	return GIT_EXEC_PATH;
+#else
+	int len;
+	char *p, *q, *sl;
+	static char *ep;
+	if (ep)
+		return ep;
+
+	len = strlen(_pgmptr);
+	if (len < 2)
+		return ep = ".";
+
+	p = ep = xmalloc(len+1);
+	q = _pgmptr;
+	sl = NULL;
+	/* copy program name, turn '\\' into '/', skip last part */
+	while ((*p = *q)) {
+		if (*q == '\\' || *q == '/') {
+			*p = '/';
+			sl = p;
+		}
+		p++, q++;
+	}
+	if (sl)
+		*sl = '\0';
+	else
+		ep[0] = '.', ep[1] = '\0';
+	return ep;
+#endif
+}
 
 void git_set_argv_exec_path(const char *exec_path)
 {
@@ -26,7 +59,7 @@ const char *git_exec_path(void)
 		return env;
 	}
 
-	return builtin_exec_path;
+	return builtin_exec_path();
 }
 
 static void add_path(struct strbuf *out, const char *path)
@@ -37,7 +70,7 @@ static void add_path(struct strbuf *out, const char *path)
 		else
 			strbuf_addstr(out, make_absolute_path(path));
 
-		strbuf_addch(out, ':');
+		strbuf_addch(out, PATH_SEP);
 	}
 }
 
@@ -50,7 +83,7 @@ void setup_path(const char *cmd_path)
 
 	add_path(&new_path, argv_exec_path);
 	add_path(&new_path, getenv(EXEC_PATH_ENVIRONMENT));
-	add_path(&new_path, builtin_exec_path);
+	add_path(&new_path, builtin_exec_path());
 	add_path(&new_path, cmd_path);
 
 	if (old_path)
@@ -65,32 +98,25 @@ void setup_path(const char *cmd_path)
 
 int execv_git_cmd(const char **argv)
 {
-	struct strbuf cmd;
-	const char *tmp;
+	int argc;
+	const char **nargv;
 
-	strbuf_init(&cmd, 0);
-	strbuf_addf(&cmd, "git-%s", argv[0]);
+	for (argc = 0; argv[argc]; argc++)
+		; /* just counting */
+	nargv = xmalloc(sizeof(*nargv) * (argc + 2));
 
-	/*
-	 * argv[0] must be the git command, but the argv array
-	 * belongs to the caller, and may be reused in
-	 * subsequent loop iterations. Save argv[0] and
-	 * restore it on error.
-	 */
-	tmp = argv[0];
-	argv[0] = cmd.buf;
-
-	trace_argv_printf(argv, "trace: exec:");
+	nargv[0] = "git";
+	for (argc = 0; argv[argc]; argc++)
+		nargv[argc + 1] = argv[argc];
+	nargv[argc + 1] = NULL;
+	trace_argv_printf(nargv, "trace: exec:");
 
 	/* execvp() can only ever return if it fails */
-	execvp(cmd.buf, (char **)argv);
+	execvp("git", (char **)nargv);
 
 	trace_printf("trace: exec failed: %s\n", strerror(errno));
 
-	argv[0] = tmp;
-
-	strbuf_release(&cmd);
-
+	free(nargv);
 	return -1;
 }
 
